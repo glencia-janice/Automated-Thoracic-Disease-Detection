@@ -1,0 +1,521 @@
+ml.py
+
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+import pandas as pd
+import numpy as np
+
+from tensorflow.keras.layers import Input
+from tensorflow.keras.applications.resnet_v2 import ResNet50V2
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.models import load_model
+
+from tensorflow.keras.applications.densenet import DenseNet121
+
+import tensorflow as tf
+
+labels = ['Atelectasis', 'Cardiomegaly', 'Consolidation', 'Effusion', 'Hernia', 'Infiltration', 'Mass', 'No Finding', 'Nodule', 'Pneumonia', 'Pneumothorax']
+
+optimizer = Adam(learning_rate=0.0005)
+
+def resnetmodel():
+    input_shape=(224, 224, 3)
+    img_input = Input(shape=input_shape)
+
+    base_model = ResNet50V2(include_top=False, input_tensor=img_input, input_shape=input_shape,
+                            pooling="avg", weights='imagenet')
+    x = base_model.output
+    predictions = Dense(len(labels), activation="sigmoid", name="output")(x)
+    model = Model(inputs=img_input, outputs=predictions)
+    model.compile(optimizer=optimizer, loss="binary_crossentropy", metrics=[tf.keras.metrics.BinaryAccuracy(), tf.keras.metrics.AUC()])
+
+    # model.load_weights("/content/drive/MyDrive/Proj/resnet50_1K.h5")
+
+    model = load_model(
+        "./models/resnet50_1K.h5", custom_objects=None, compile=True, safe_mode=True
+    )
+
+    return model
+
+
+def densenet():
+    input_shape=(224, 224, 3)
+    img_input = Input(shape=input_shape)
+
+    base_model = DenseNet121(include_top=False, input_tensor=img_input, input_shape=input_shape, 
+                            pooling="avg", weights='imagenet')
+    x = base_model.output
+    predictions = Dense(len(labels), activation="sigmoid", name="output")(x)
+    model = Model(inputs=img_input, outputs=predictions)
+
+
+    model.compile(optimizer=optimizer, loss="binary_crossentropy", metrics=[tf.keras.metrics.BinaryAccuracy(), 
+                                                                            tf.keras.metrics.AUC()])
+    
+    model.load_weights("./models/ds121_1K.h5")
+    return model
+
+model = densenet()
+# model.compile(optimizer=optimizer, loss="binary_crossentropy", metrics=[tf.keras.metrics.BinaryAccuracy(), tf.keras.metrics.AUC()])
+
+
+
+
+
+
+def sharpening(img):
+    kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
+    image_sharp = cv2.filter2D(src=img, ddepth=-1, kernel=kernel)
+    return image_sharp
+
+
+
+def predictDisease():
+    train_datagen_aug = ImageDataGenerator(rescale=1/255.,preprocessing_function=sharpening)
+
+    data = pd.DataFrame({"path_gambar":["./input.png"]})
+
+    train_data_aug = train_datagen_aug.flow_from_dataframe(data,
+                                                x_col="path_gambar",
+                                                y_col=None,
+                                                target_size=(224,224),
+                                                classes=labels,
+                                                color_mode="rgb",
+                                                class_mode=None,
+                                                seed=42,
+                                                batch_size=1)
+    pred = model.predict(train_data_aug)
+    # print(pred)
+    return [(labels[np.argmax(pred)]),pred]
+
+
+
+
+
+requirements.txt
+
+absl-py==2.1.0
+aiohappyeyeballs==2.4.0
+aiohttp==3.10.6
+aioresponses==0.7.6
+aiosignal==1.3.1
+astunparse==1.6.3
+async-timeout==4.0.3
+attrs==24.2.0
+backoff==2.2.1
+blinker==1.8.2
+certifi==2024.8.30
+charset-normalizer==2.0.12
+click==8.1.7
+contourpy==1.3.0
+cycler==0.12.1
+dataclasses-json==0.6.7
+defusedxml==0.7.1
+filelock==3.16.1
+Flask==3.0.3
+flatbuffers==24.3.25
+fonttools==4.53.1
+frozenlist==1.4.1
+fsspec==2024.9.0
+gast==0.6.0
+google-pasta==0.2.0
+grpcio==1.66.1
+h5py==3.11.0
+idna==3.10
+importlib_metadata==8.5.0
+importlib_resources==6.4.5
+itsdangerous==2.2.0
+Jinja2==3.1.4
+keras==3.5.0
+kiwisolver==1.4.7
+libclang==18.1.1
+Markdown==3.7
+markdown-it-py==3.0.0
+markdown2==2.5.0
+MarkupSafe==2.1.5
+marshmallow==3.22.0
+matplotlib==3.9.2
+mdurl==0.1.2
+ml-dtypes==0.4.1
+mpmath==1.3.0
+multidict==6.1.0
+mypy-extensions==1.0.0
+namex==0.0.8
+networkx==3.2.1
+numpy
+opencv-python==4.10.0.84
+opencv-python-headless==4.10.0.84
+opt-einsum==3.3.0
+optree==0.12.1
+packaging==24.1
+pandas==2.2.3
+pillow==10.4.0
+protobuf==4.25.5
+psutil==6.0.0
+py-cpuinfo==9.0.0
+Pygments==2.18.0
+pyparsing==3.1.4
+python-dateutil==2.9.0.post0
+pytz==2024.2
+PyYAML==6.0.2
+requests
+rich==13.8.1
+scipy==1.13.1
+seaborn==0.13.2
+segment-anything-py==1.0.1
+six==1.16.0
+sympy==1.13.3
+tensorboard==2.17.1
+tensorboard-data-server==0.7.2
+tensorflow==2.17.0
+termcolor==2.4.0
+torch==2.4.1
+torchvision==0.19.1
+tqdm==4.66.5
+typing-inspect==0.9.0
+typing_extensions==4.12.2
+tzdata==2024.1
+ultralytics==8.2.101
+ultralytics-thop==2.0.8
+urllib3==1.26.20
+Werkzeug==3.0.4
+wrapt==1.16.0
+yarl==1.12.1
+zipp==3.20.2
+
+
+app.py
+
+from flask import Flask, render_template
+from flask import request, jsonify, send_from_directory
+
+from ml import predictDisease
+from yolo import yolo_predict
+import markdown2
+
+from segmentany import segmentmodel
+
+app = Flask(__name__)
+
+steps = {
+    "Cardiomegaly": """
+## Cardiomegaly Management Tips
+
+### 1. Reducing Salt
+- Try to reduce or avoid salt, and look for foods labeled "low sodium" or "no salt added". Excess salt can lead to high blood pressure, straining the heart.
+
+### 2. Limiting Saturated and Trans Fats
+- Cut back on fatty meats, high-fat dairy products, and processed foods. These fats raise cholesterol levels, increasing the risk of artery blockage.
+
+### 3. Eating More Fruits and Vegetables
+- Eat a variety of fruits and vegetables to increase fiber in your diet. They provide essential nutrients and help manage weight and cholesterol.
+
+### 4. Choosing Lean Proteins
+- Opt for lean meats, poultry, fish, low-fat or fat-free dairy products, and eggs. Lean proteins help maintain heart health without the excess unhealthy fats.
+
+### 5. Eating Whole Grains
+- Swap out processed grains for whole grains like oats, brown rice, and whole wheat. Whole grains provide more fiber, helping to lower cholesterol.
+
+### 6. Avoiding or Limiting Alcohol and Caffeine
+- Try to limit or avoid alcohol and caffeine as they can elevate blood pressure and add strain on the heart.
+
+### 7. Exercising Regularly
+- Engage in regular physical activity to improve cardiovascular health, manage weight, and reduce the risk of high blood pressure and diabetes.
+
+### 8. Controlling Risk Factors
+- Focus on controlling heart disease risk factors like high cholesterol, high blood pressure, and diabetes through diet, exercise, and medication if necessary.
+""",
+    "Atelectasis": """
+## Atelectasis Management Tips
+
+### 1. Deep Breathing Exercises
+- Perform deep breathing exercises using a device like a spirometer to help expand the lungs and prevent collapse.
+
+### 2. Postural Drainage
+- Use specific body positions to help drain mucus and fluids from the lungs, allowing for better lung expansion.
+
+### 3. Chest Physiotherapy
+- Engage in chest physiotherapy techniques such as percussion or vibration to loosen mucus and clear airways.
+
+### 4. Adequate Hydration
+- Drink plenty of fluids to keep mucus thin and easier to expel, preventing further airway obstruction.
+
+### 5. Bronchodilators and Medications
+- Use prescribed bronchodilators or medications to open up the airways and aid in mucus clearance.
+
+### 6. Avoid Smoking
+- Stop smoking and avoid secondhand smoke to promote better lung function and reduce inflammation.
+
+### 7. Treating Underlying Conditions
+- If atelectasis is caused by other conditions like pneumonia or tumors, treat the underlying cause to promote lung recovery.
+""",
+    "Consolidation": """
+## Consolidation Management Tips
+
+### 1. Treat the Underlying Cause
+- Antibiotics, antivirals, or antifungals should be used if consolidation is due to an infection like pneumonia.
+
+### 2. Breathing Exercises
+- Practice deep breathing and coughing exercises to help mobilize secretions and improve lung function.
+
+### 3. Hydration
+- Stay well-hydrated to keep mucus thin and easier to clear from the lungs.
+
+### 4. Supplemental Oxygen
+- If breathing is compromised, supplemental oxygen might be needed to ensure adequate oxygenation.
+
+### 5. Postural Drainage and Chest Therapy
+- Use postural drainage techniques and chest physiotherapy to clear secretions and prevent further lung damage.
+""",
+    "Effusion": """
+## Effusion Management Tips
+
+### 1. Drainage Procedures
+- Pleural effusion may require procedures like thoracentesis to remove excess fluid from around the lungs.
+
+### 2. Treat the Underlying Cause
+- Address the root cause of effusion, such as heart failure, infection, or cancer, to prevent recurrence.
+
+### 3. Oxygen Therapy
+- Use oxygen therapy if breathing is impaired due to fluid buildup.
+
+### 4. Medication
+- Diuretics may be prescribed to help remove excess fluid, especially if caused by heart failure.
+
+### 5. Rest and Hydration
+- Ensure proper rest and hydration to support overall lung recovery and reduce strain on the heart and lungs.
+""",
+    "Hernia": """
+## Hernia Management Tips
+
+### 1. Avoid Heavy Lifting
+- Avoid activities that strain the abdominal muscles, such as heavy lifting, to prevent worsening the hernia.
+
+### 2. Maintain a Healthy Weight
+- Achieving and maintaining a healthy weight can help reduce pressure on the abdominal muscles.
+
+### 3. Wear a Support Belt
+- Consider using a hernia support belt to help relieve discomfort and prevent hernia progression.
+
+### 4. Follow Up on Surgery
+- In cases where hernia repair surgery is necessary, follow your doctor's advice regarding recovery and post-surgery care.
+
+### 5. Prevent Constipation
+- Avoid constipation by eating a high-fiber diet and staying hydrated, as straining during bowel movements can aggravate hernias.
+""",
+    "Infiltration": """
+## Infiltration Management Tips
+
+### 1. Treat Underlying Conditions
+- Identify and treat the underlying cause of the lung infiltration, such as infection, inflammation, or cancer.
+
+### 2. Maintain Hydration
+- Drink plenty of fluids to keep secretions thin and help clear any blockage.
+
+### 3. Oxygen Therapy
+- Use supplemental oxygen if needed to maintain adequate oxygen levels during recovery.
+
+### 4. Pulmonary Rehabilitation
+- Engage in pulmonary rehabilitation exercises to improve lung function and clear secretions.
+""",
+    "Mass": """
+## Mass Management Tips
+
+### 1. Biopsy or Imaging
+- Get proper imaging (CT scan, MRI, or biopsy) to determine the nature of the mass and decide on treatment options.
+
+### 2. Medical Treatment
+- If the mass is benign, it might be monitored regularly. Malignant masses may require surgery, chemotherapy, or radiation.
+
+### 3. Smoking Cessation
+- Quit smoking to reduce further lung damage and lower the risk of malignancy in the lungs.
+
+### 4. Maintain a Healthy Diet
+- Eat a balanced diet to support your immune system, especially if undergoing cancer treatment.
+""",
+    "No Finding": """
+## General Lung Health Tips
+
+### 1. Maintain a Healthy Lifestyle
+- Eat a balanced diet, exercise regularly, and avoid smoking to maintain good lung health.
+
+### 2. Avoid Pollutants
+- Stay away from environmental pollutants like smoke, chemicals, and allergens that can harm the lungs.
+
+### 3. Stay Hydrated
+- Drink plenty of water to keep mucus thin and help the lungs function properly.
+
+### 4. Regular Check-ups
+- Schedule regular medical check-ups to monitor lung health and catch any issues early on.
+""",
+    "Nodule": """
+## Nodule Management Tips
+
+### 1. Monitor the Nodule
+- Small, benign nodules might require regular monitoring with imaging to track any changes.
+
+### 2. Biopsy or Further Testing
+- If the nodule shows signs of growth or is suspicious, your doctor might recommend a biopsy or further tests.
+
+### 3. Stop Smoking
+- Quitting smoking reduces the risk of nodules becoming cancerous and supports lung health.
+
+### 4. Regular Follow-up
+- Follow your doctor’s advice on monitoring and treatment, including follow-up CT scans or MRIs.
+""",
+    "Pneumonia": """
+## Pneumonia Management Tips
+
+### 1. Complete Antibiotic Treatment
+- If bacterial, ensure the full course of antibiotics is taken as prescribed, even if symptoms improve.
+
+### 2. Rest and Hydration
+- Rest is crucial for recovery, and staying hydrated helps thin mucus and reduces fever.
+
+### 3. Breathing Exercises
+- Perform deep breathing and coughing exercises to clear mucus from the lungs.
+
+### 4. Manage Fever and Pain
+- Use fever reducers or pain medications as directed to manage symptoms.
+
+### 5. Avoid Smoking
+- Smoking can worsen lung inflammation, so avoid smoking and secondhand smoke during recovery.
+""",
+    "Pneumothorax": """
+## Pneumothorax Management Tips
+
+### 1. Seek Immediate Medical Help
+- A pneumothorax (collapsed lung) is a medical emergency and requires immediate attention.
+
+### 2. Avoid High Altitudes and Scuba Diving
+- High altitudes and pressure changes can worsen or trigger a pneumothorax, so avoid these activities until fully recovered.
+
+### 3. Avoid Strenuous Exercise
+- Refrain from strenuous physical activity during recovery to prevent lung stress.
+
+### 4. Follow Medical Advice
+- Surgery or procedures like chest tube insertion may be required to reinflate the lung; follow your doctor's instructions.
+"""
+}
+
+
+@app.route('/static/<path:path>')
+def serve_static(path):
+    return send_from_directory('static', path)
+
+
+@app.route('/')
+def home():
+    return render_template("index.html")
+
+
+@app.route('/imgupl')
+def image_page():
+    return render_template("upload.html")
+
+
+@app.route('/result')
+def result():
+    return render_template("result.html")
+
+
+@app.route("/imgchk", methods=["POST"])
+def image_check():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    
+    file = request.files['file']
+    
+    if file and file.content_type not in ["image/jpeg", "image/png"]:
+        return jsonify({"error": "File must be an image (JPEG or PNG)"}), 400
+    
+    file.save("input.png")
+    # return
+    pred = predictDisease()
+
+    # return
+    boxes = yolo_predict()
+    i=0
+
+    imgs =[]
+    for box in boxes:
+        # print(box[:4])
+        segmentmodel(box=box[:4],n=i)
+        imgs.append(i)
+        i+=1
+
+    html_content = markdown2.markdown(steps[pred[0]])
+    return render_template("result.html",label=pred[0],probs=pred[1][0].tolist(), detections=boxes, recommendation = html_content,img=imgs)
+
+
+@app.route("/segments")
+def segments():
+    return render_template("segments.html")
+
+
+@app.route("/xray")
+def get_xray_image():
+    return send_from_directory(directory='.', path='input.png', mimetype='image/png')
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+
+yolo.py
+
+import cv2
+from ultralytics import YOLO
+# from inference_sdk import InferenceHTTPClient, InferenceConfiguration
+# from roboflowoak import RoboflowOak
+
+# Load the YOLO model
+best_model = YOLO("models/8c.pt")
+
+# CLIENT = InferenceHTTPClient(
+#     api_url="https://detect.roboflow.com",
+#     api_key="ANXcUrdWUNRwxepj88yY"
+# )
+
+# custom_configuration = InferenceConfiguration(confidence_threshold=0.05)
+
+# Multi = InferenceHTTPClient(
+#     api_url="https://detect.roboflow.com",
+#     api_key="ANXcUrdWUNRwxepj88yY",
+# )
+
+
+
+# rf = RoboflowOak(model="lung-lzjkc", confidence=0.05, overlap=0.5,
+#     version="1", api_key="ANXcUrdWUNRwxepj88yY", rgb=True,
+#     depth=True, device=None, blocking=True)
+
+
+def yolo_predict():
+    # results = best_model(['./test.png'])
+    results = best_model.predict("./input.png", conf=0.1)
+    result = results[0]
+
+    predictions = []
+    for box in result.boxes:
+        x, y, w, h = box.xywh[0].tolist()  # Convert tensor to list
+        label = result.names[int(box.cls)]
+        confidence = float(box.conf)
+        predictions.append([x, y, w, h, label, confidence])
+    # print(predictions)
+    return predictions
+
+
+
+
+    # # result = CLIENT.infer('./test.png', model_id="pr_proj/2")
+    # result = Multi.infer("./test.png", model_id="lung-lzjkc/1")
+
+    # with Multi.use_configuration(custom_configuration):
+    #     result = Multi.infer("input.png", model_id="soccer-players-5fuqs/1")
+    #     print(result)
+
